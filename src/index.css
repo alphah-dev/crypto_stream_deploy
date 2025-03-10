@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* General Styling */
+body {
+  @apply bg-gray-50 text-gray-800;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+/* Header */
+header {
+  @apply bg-white shadow-md p-4;
+}
+
+/* Navigation Sidebar */
+aside {
+  @apply w-1/4 p-4 bg-white rounded-lg shadow-md;
+}
+
+aside h3 {
+  @apply font-semibold mb-2 text-gray-700;
+}
+
+aside ul li a, aside ul li {
+  @apply block py-2 text-gray-600 hover:text-blue-600 transition;
+}
+
+/* Main Content */
+main {
+  @apply w-3/4 ml-4;
+}
+
+.main-container {
+  @apply bg-white p-4 rounded-lg shadow-md;
+}
+
+/* Category Buttons */
+.category-buttons {
+  @apply flex space-x-2 mb-4;
+}
+
+.category-buttons button {
+  @apply px-3 py-1 rounded text-sm transition;
+}
+
+.category-buttons .active {
+  @apply bg-purple-200 text-purple-800 font-semibold;
+}
+
+/* Video Cards */
+.video-card {
+  @apply bg-white rounded-lg shadow-md overflow-hidden p-4 mb-4;
+}
+
+.video-card img {
+  @apply w-full rounded-md;
+}
+
+.video-card h3 {
+  @apply font-semibold mt-2 text-lg text-gray-800;
+}
+
+.video-card p {
+  @apply text-sm text-gray-600;
+}
+
+/* Creator Section */
+.creator-section {
+  @apply bg-white p-4 rounded-lg shadow-md mt-4;
+}
+
+.creator-card {
+  @apply flex items-center justify-between p-4 border-b;
+}
+
+.creator-card:last-child {
+  @apply border-none;
+}
+
+.creator-card img {
+  @apply w-10 h-10 rounded-full;
+}
+
+.creator-card button {
+  @apply bg-blue-600 text-white px-4 py-2 rounded text-sm;
+}
+
+/* Footer */
+footer {
+  @apply bg-white mt-4 p-4 text-center text-gray-600;
+}
+
+.footer-container {
+  @apply container mx-auto flex justify-between;
+}
+
+.footer-container div {
+  @apply text-sm;
+}
+
+.footer-container p {
+  @apply font-semibold text-gray-700;
+}
+
+.footer-social-icons {
+  @apply flex space-x-2 justify-center mt-2;
+}
