@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import { useParams } from "react-router-dom";
+import axios from "axios";
+
+const BACKEND_URL = 'https://crypto-stream-backend-5.onrender.com';
 
 function VideoPlayer({ user }) {
   const { permlink } = useParams();
@@ -10,11 +13,10 @@ function VideoPlayer({ user }) {
   const [video, setVideo] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-  const [error, setError] = useState(null); // Error state
+  const [error, setError] = useState(null);
   const platformWallet = "cryptostream";
 
   useEffect(() => {
-    // Reset error and video state when permlink changes
     setError(null);
     setVideo(null);
 
@@ -24,44 +26,44 @@ function VideoPlayer({ user }) {
       return;
     }
 
-    // Fetch video data
-    fetch(`http://localhost:5000/api/videos?permlink=${permlink}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to fetch video: ${res.status}`);
-        return res.json();
-      })
-      .then((videos) => {
-        const v = Array.isArray(videos) ? videos.find((vid) => vid.permlink === permlink) : videos;
+    const fetchVideo = async () => {
+      try {
+        const res = await axios.get(`${BACKEND_URL}/api/videos`);
+        const v = res.data.find((vid) => vid.permlink === permlink);
         if (!v) throw new Error(`Video with permlink ${permlink} not found`);
-        console.log("Fetched video data:", v); // Debug: Log fetched video
+        console.log("Fetched video data:", v);
         setVideo(v);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Video fetch error:", err.message);
         setError(`Failed to load video: ${err.message}`);
-      });
+      }
+    };
+    fetchVideo();
   }, [permlink]);
 
   useEffect(() => {
     if (video && videoRef.current) {
-      const videoUrl = `https://ipfs.io/ipfs/${video.cid}`; // Primary IPFS source
-      const fallbackUrl = video.torrent || ""; // Fallback to torrent if available
+      const videoUrl = video.cid ? `https://ipfs.io/ipfs/${video.cid}` : null;
+      const fallbackUrl = video.torrent || "";
 
-      // Initialize or update video.js player
+      if (!videoUrl && !fallbackUrl) {
+        setError("No video source available. This video may not be uploaded via CryptoStream.");
+        return;
+      }
+
       if (!playerRef.current) {
         playerRef.current = videojs(videoRef.current, {
           controls: true,
           sources: [
-            { src: videoUrl, type: "video/mp4" },
+            ...(videoUrl ? [{ src: videoUrl, type: "video/mp4" }] : []),
             ...(fallbackUrl ? [{ src: fallbackUrl, type: "video/mp4" }] : []),
-          ],
+          ].filter(Boolean),
           fluid: true,
           preload: "auto",
         }, () => {
-          console.log("Player initialized with source:", videoUrl);
+          console.log("Player initialized with source:", videoUrl || fallbackUrl);
         });
 
-        // Add error handling for video.js
         playerRef.current.on("error", () => {
           const errorMsg = "Failed to play video. The IPFS CID or torrent may be unavailable.";
           console.error(errorMsg, playerRef.current.error());
@@ -69,9 +71,9 @@ function VideoPlayer({ user }) {
         });
       } else {
         playerRef.current.src([
-          { src: videoUrl, type: "video/mp4" },
+          ...(videoUrl ? [{ src: videoUrl, type: "video/mp4" }] : []),
           ...(fallbackUrl ? [{ src: fallbackUrl, type: "video/mp4" }] : []),
-        ]);
+        ].filter(Boolean));
         playerRef.current.load();
         playerRef.current.play().catch((err) => {
           console.error("Playback error:", err);
@@ -79,14 +81,17 @@ function VideoPlayer({ user }) {
         });
       }
 
-      // Fetch comments
-      fetch(`http://localhost:5000/api/comments/${video.author}/${permlink}`)
-        .then((res) => res.json())
-        .then(setComments)
-        .catch((err) => console.error("Comments fetch error:", err));
+      const fetchComments = async () => {
+        try {
+          const res = await axios.get(`${BACKEND_URL}/api/comments/${video.author}/${permlink}`);
+          setComments(res.data);
+        } catch (err) {
+          console.error("Comments fetch error:", err);
+        }
+      };
+      fetchComments();
     }
 
-    // Cleanup on unmount or video change
     return () => {
       if (playerRef.current) {
         playerRef.current.dispose();
@@ -97,6 +102,7 @@ function VideoPlayer({ user }) {
 
   const donate = () => {
     if (!user || !video) return alert("Login and select a video");
+    if (!window.hive_keychain) return alert("Hive Keychain is required");
     window.hive_keychain.requestTransfer(
       user,
       video.author,
@@ -121,6 +127,7 @@ function VideoPlayer({ user }) {
 
   const subscribe = () => {
     if (!user || !video) return alert("Login and select a video");
+    if (!window.hive_keychain) return alert("Hive Keychain is required");
     window.hive_keychain.requestTransfer(
       user,
       video.author,
@@ -143,19 +150,19 @@ function VideoPlayer({ user }) {
     );
   };
 
-  const submitComment = () => {
+  const submitComment = async () => {
     if (!user || !newComment || !video) return alert("Login, select a video, and enter a comment");
-    fetch("http://localhost:5000/api/reward-points", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: user, activity: "comment" }),
-    })
-      .then((res) => res.json())
-      .then((data) => alert(data.message))
-      .catch((err) => alert("Error rewarding points: " + err.message));
-
-    setComments([...comments, { author: user, body: newComment, permlink: `${permlink}-comment-${Date.now()}` }]);
-    setNewComment("");
+    try {
+      const res = await axios.post(`${BACKEND_URL}/api/reward-points`, {
+        username: user,
+        activity: "comment",
+      });
+      alert(res.data.message);
+      setComments([...comments, { author: user, body: newComment, permlink: `${permlink}-comment-${Date.now()}`, created: new Date().toISOString() }]);
+      setNewComment("");
+    } catch (err) {
+      alert("Error rewarding points: " + (err.response?.data?.error || err.message));
+    }
   };
 
   return (
@@ -189,7 +196,7 @@ function VideoPlayer({ user }) {
           <h3 className="mt-4 font-semibold">Comments</h3>
           {comments.map((c) => (
             <p key={c.permlink} className="mt-2">
-              {c.author}: {c.body}
+              {c.author}: {c.body} <span className="text-sm text-gray-500">({new Date(c.created).toLocaleString()})</span>
             </p>
           ))}
           {user && (
