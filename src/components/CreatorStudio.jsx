@@ -137,8 +137,11 @@
 // export default CreatorStudio;
 
 import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 
-function CreatorStudio({ user }) {
+const BACKEND_URL = 'https://crypto-stream-backend-5.onrender.com';
+
+function CreatorStudio({ user, fetchVideos }) {
   const [file, setFile] = useState(null);
   const [category, setCategory] = useState('video');
   const [cid, setCid] = useState('');
@@ -187,22 +190,25 @@ function CreatorStudio({ user }) {
     formData.append('premium', premium);
 
     try {
-      const res = await fetch('http://localhost:5000/api/upload', {
-        method: 'POST',
-        body: formData,
+      const res = await axios.post(`${BACKEND_URL}/api/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000, // 60 seconds timeout
+        maxContentLength: Infinity, // Allow large files
+        maxBodyLength: Infinity, // Allow large files
       });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || `Upload failed with status ${res.status}`);
-      }
-      const data = await res.json();
-      setCid(data.cid);
-      setPermlink(data.permlink);
+      setCid(res.data.cid);
+      setPermlink(res.data.permlink);
       alert('Video uploaded successfully!');
+      if (fetchVideos) {
+        await fetchVideos();
+      }
     } catch (error) {
-      console.error('Upload error:', error);
-      setError(`Upload failed: ${error.message}`);
-      alert(`Upload failed: ${error.message}`);
+      console.error('Upload error details:', error.response?.data || error.message);
+      const errorMessage = error.code === 'ECONNABORTED'
+        ? 'Upload timed out. The backend may be slow—please try again in a minute.'
+        : error.response?.data?.error || error.message;
+      setError(`Upload failed: ${errorMessage}`);
+      alert(`Upload failed: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -222,6 +228,10 @@ function CreatorStudio({ user }) {
     if (!user) {
       setError('Please log in to subscribe.');
       return alert('Please log in to subscribe.');
+    }
+    if (!window.hive_keychain) {
+      setError('Hive Keychain is required for subscription.');
+      return alert('Hive Keychain is required for subscription.');
     }
     window.hive_keychain.requestTransfer(user, 'cryptostream', '10.000 HBD', 'Premium Feature Subscription', (err) => {
       if (!err) {
